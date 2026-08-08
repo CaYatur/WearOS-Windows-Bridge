@@ -16,8 +16,13 @@ class MainActivity : AppCompatActivity() {
    root.addView(Switch(this).apply { text=label; isChecked=prefs.getBoolean(key,key=="media"||key=="status"); setOnCheckedChangeListener { _,v->prefs.edit().putBoolean(key,v).apply() } })
   }
   val host=EditText(this).apply { hint="PC local IP (example 192.168.1.10)"; setText(prefs.getString("host","")) }
-  root.addView(host)
-  root.addView(Button(this).apply { text="Save & start bridge"; setOnClickListener { prefs.edit().putString("host",host.text.toString().trim()).apply(); startService(Intent(this@MainActivity,BridgeMediaService::class.java)); Toast.makeText(this@MainActivity,"Bridge started",Toast.LENGTH_SHORT).show() } })
+  val pairingKey=EditText(this).apply { hint="Pairing key (Base64, shown by Windows pairing UI)"; setText(prefs.getString("pairingKey","")) }
+  root.addView(host); root.addView(pairingKey)
+  root.addView(Button(this).apply { text="Save & start bridge"; setOnClickListener {
+   if (BridgeProtocol.decodeKey(pairingKey.text.toString()) == null) { Toast.makeText(this@MainActivity,"Pairing key must be a valid 256-bit Base64 key",Toast.LENGTH_LONG).show(); return@setOnClickListener }
+   prefs.edit().putString("host",host.text.toString().trim()).putString("pairingKey",pairingKey.text.toString().trim()).apply()
+   startService(Intent(this@MainActivity,BridgeMediaService::class.java)); Toast.makeText(this@MainActivity,"Bridge started",Toast.LENGTH_SHORT).show()
+  } })
   root.addView(TextView(this).apply { text="Clipboard is off by default. Pairing keys are stored locally and are never displayed in logs." })
   setContentView(root)
  }

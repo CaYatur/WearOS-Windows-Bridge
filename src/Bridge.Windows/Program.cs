@@ -17,7 +17,9 @@ var enabled = BridgeFeature.Media | BridgeFeature.PcStatus;
 var listener = new TcpListener(IPAddress.Any, Port);
 listener.Start();
 Console.WriteLine($"WearOS Windows Bridge listening on LAN TCP {Port}");
-Console.WriteLine("Pairing key is stored in LocalAppData and is intentionally not printed.");
+Console.WriteLine("Pair this Android device once using the following local secret:");
+Console.WriteLine(Convert.ToBase64String(key));
+Console.WriteLine("Treat this value like a password. Regenerate it if it is ever exposed.");
 
 while (true)
 {
