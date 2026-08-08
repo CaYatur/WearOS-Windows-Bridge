@@ -20,9 +20,9 @@ Each module is independently switchable in Android settings and represented in t
 ## Repository layout
 
 - `src/Bridge.Protocol` — transport-independent JSON protocol, feature flags and HMAC authentication.
-- `src/Bridge.Windows` — Windows host, media/session adapter and LAN server.
+- `src/Bridge.Windows` — Windows tray host, media/session adapter, RFCOMM server, LAN server and companion feature providers.
 - `tests/Bridge.Protocol.Tests` — protocol/security tests.
-- `android/` — Android companion skeleton using Media3 MediaSessionService, Bluetooth RFCOMM and LAN fallback.
+- `android/` — Android companion using Media3 MediaSessionService with Bluetooth-first RFCOMM and automatic LAN fallback.
 
 ## Security model
 
@@ -38,9 +38,20 @@ dotnet test WearOSWindowsBridge.slnx
 
 The Android project is intentionally a normal Gradle Android app and can be opened directly in Android Studio.
 
-## Status
+## Build and pairing
 
-This repository is an actively developed MVP. Protocol/authentication and the Windows LAN host are executable/testable. Bluetooth and Android MediaSession integration require real-device validation because neither a paired Wear OS device nor Android emulator is exposed to the coding workspace.
+1. Start the Windows tray application. Double-click its tray icon and open **Pairing info**.
+2. Pair the Android phone with the PC in Windows/Android Bluetooth settings.
+3. In Android, enter the PC's LAN IP, Bluetooth MAC address (optional but required for Bluetooth-first operation), and the displayed pairing key.
+4. Enable only the modules you want and tap **Save & start bridge**. Bluetooth is preferred; LAN is used automatically while Bluetooth is unavailable.
+
+Windows release build: `dotnet publish src/Bridge.Windows/Bridge.Windows.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true`
+
+Android debug APK: run `gradlew assembleDebug` inside `android/` (or use Android Studio).
+
+## Validation status
+
+Windows Release build, self-contained publish, Android debug APK build, and protocol/security unit tests are verified in the development workspace. The remaining validation boundary is physical-device interoperability: a paired Android phone/Wear OS watch was not connected to ADB in the coding workspace, so real Bluetooth radio behavior and the watch vendor's media UI still require a device smoke test before calling a release production-verified.
 
 ## License
 

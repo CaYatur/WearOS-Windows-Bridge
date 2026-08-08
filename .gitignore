@@ -1,4 +1,5 @@
 .caya-agent/
+artifacts/
 **/bin/
 **/obj/
 **/build/

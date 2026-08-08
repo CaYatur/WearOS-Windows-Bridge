@@ -22,7 +22,7 @@ class MainActivity : AppCompatActivity() {
   root.addView(Button(this).apply { text="Save & start bridge"; setOnClickListener {
    if (BridgeProtocol.decodeKey(pairingKey.text.toString()) == null) { Toast.makeText(this@MainActivity,"Pairing key must be a valid 256-bit Base64 key",Toast.LENGTH_LONG).show(); return@setOnClickListener }
    prefs.edit().putString("host",host.text.toString().trim()).putString("bluetoothAddress",bluetoothAddress.text.toString().trim()).putString("pairingKey",pairingKey.text.toString().trim()).apply()
-   startService(Intent(this@MainActivity,BridgeMediaService::class.java)); Toast.makeText(this@MainActivity,"Bridge started",Toast.LENGTH_SHORT).show()
+   androidx.core.content.ContextCompat.startForegroundService(this@MainActivity,Intent(this@MainActivity,BridgeMediaService::class.java)); Toast.makeText(this@MainActivity,"Bridge started",Toast.LENGTH_SHORT).show()
   } })
   root.addView(TextView(this).apply { text="Clipboard is off by default. Pairing keys are stored locally and are never displayed in logs." })
   setContentView(root)
