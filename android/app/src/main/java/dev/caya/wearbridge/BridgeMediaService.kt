@@ -19,9 +19,9 @@ class BridgeMediaService : MediaSessionService() {
   super.onCreate()
   remotePlayer = RemoteWindowsPlayer()
   lan = LanBridgeClient(this, { state -> remotePlayer.update(state) }, { connected -> remotePlayer.setConnected(connected) })
-  remotePlayer.commandSink = { command ->
+  remotePlayer.commandSink = commandSink@{ command ->
    val prefs=getSharedPreferences("bridge",MODE_PRIVATE)
-   val key=BridgeProtocol.decodeKey(prefs.getString("pairingKey","").orEmpty()) ?: return@RemoteWindowsPlayer
+   val key=BridgeProtocol.decodeKey(prefs.getString("pairingKey","").orEmpty()) ?: return@commandSink
    lan.send(BridgeProtocol.command(key, command))
   }
   session = MediaSession.Builder(this, remotePlayer).build()

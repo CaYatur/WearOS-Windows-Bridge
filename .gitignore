@@ -1,6 +1,7 @@
 .caya-agent/
 **/bin/
 **/obj/
+**/build/
 .gradle/
 .idea/
 *.user
