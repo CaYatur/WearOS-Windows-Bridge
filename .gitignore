@@ -1,0 +1,9 @@
+.caya-agent/
+**/bin/
+**/obj/
+.gradle/
+.idea/
+*.user
+*.suo
+local.properties
+.DS_Store
