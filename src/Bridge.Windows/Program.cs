@@ -13,7 +13,8 @@ else { key = BridgeCodec.NewPairingKey(); await File.WriteAllTextAsync(keyPath, 
 
 var media = new WindowsMediaBridge();
 await media.InitializeAsync();
-var enabled = BridgeFeature.Media | BridgeFeature.PcStatus;
+using var features = new WindowsFeatures();
+var handler = new BridgeConnectionHandler(media, features, key);
 var listener = new TcpListener(IPAddress.Any, Port);
 listener.Start();
 Console.WriteLine($"WearOS Windows Bridge listening on LAN TCP {Port}");
@@ -24,24 +25,10 @@ Console.WriteLine("Treat this value like a password. Regenerate it if it is ever
 while (true)
 {
     var client = await listener.AcceptTcpClientAsync();
-    _ = HandleAsync(client);
-}
-
-async Task HandleAsync(TcpClient client)
-{
-    using var ownedClient = client;
-    using var stream = client.GetStream();
-    using var reader = new StreamReader(stream, Encoding.UTF8, false, 8192, true);
-    using var writer = new StreamWriter(stream, new UTF8Encoding(false), 8192, true) { AutoFlush = true };
-    while (client.Connected)
+    _ = Task.Run(async () =>
     {
-        var line = await reader.ReadLineAsync(); if (line is null) break;
-        SignedEnvelope? request;
-        try { request = BridgeCodec.Deserialize(line); } catch { continue; }
-        if (request is null || !BridgeCodec.Verify(request, key, TimeSpan.FromMinutes(2))) continue;
-        if (request.Type == BridgeMessageType.Command && request.Payload.Command is { } command) await media.ExecuteAsync(command);
-        var state = await media.ReadAsync();
-        var response = BridgeCodec.Sign(BridgeMessageType.State, new BridgePayload(enabled, state), key);
-        await writer.WriteLineAsync(BridgeCodec.Serialize(response));
-    }
+        using (client)
+        try { await handler.HandleAsync(client.GetStream()); }
+        catch (Exception ex) { Console.Error.WriteLine($"Client disconnected: {ex.Message}"); }
+    });
 }
