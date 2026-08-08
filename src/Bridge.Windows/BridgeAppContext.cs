@@ -14,6 +14,9 @@ public sealed class BridgeAppContext : ApplicationContext
         _key = key;
         var menu = new ContextMenuStrip();
         menu.Items.Add("Pairing info", null, (_,_) => ShowPairing());
+        var startup = new ToolStripMenuItem("Start with Windows") { CheckOnClick=true, Checked=StartupManager.IsEnabled() };
+        startup.CheckedChanged += (_,_) => { try { StartupManager.SetEnabled(startup.Checked); } catch(Exception ex) { MessageBox.Show(ex.Message,"Startup setting",MessageBoxButtons.OK,MessageBoxIcon.Error); startup.Checked=StartupManager.IsEnabled(); } };
+        menu.Items.Add(startup);
         menu.Items.Add("Open GitHub", null, (_,_) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://github.com/CaYatur/WearOS-Windows-Bridge") { UseShellExecute=true }));
         menu.Items.Add("Exit", null, (_,_) => ExitThread());
         _tray = new NotifyIcon { Text="WearOS Windows Bridge", Icon=SystemIcons.Application, Visible=true, ContextMenuStrip=menu };
