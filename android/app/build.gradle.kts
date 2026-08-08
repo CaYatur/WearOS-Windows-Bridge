@@ -10,4 +10,9 @@ dependencies {
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.media3:media3-session:1.8.0")
     implementation("androidx.media3:media3-common:1.8.0")
+
+    testImplementation("junit:junit:4.13.2")
+    // Real org.json on the unit-test classpath. The mockable android.jar only has stubs that throw,
+    // and the protocol vectors need JSONObject to actually parse.
+    testImplementation("org.json:json:20240303")
 }

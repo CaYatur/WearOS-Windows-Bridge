@@ -35,8 +35,26 @@ public sealed class AutoPairingServer : IDisposable
             var approved=false;
             using(var done=new ManualResetEventSlim())
             {
-                ThreadPool.QueueUserWorkItem(_=>{approved=MessageBox.Show($"Allow pairing with {name}?\n\nOnly approve devices you recognize.","WearOS Windows Bridge",MessageBoxButtons.YesNo,MessageBoxIcon.Question)==DialogResult.Yes;done.Set();});
-                done.Wait(TimeSpan.FromSeconds(30));
+                // MessageBox must run on an STA thread. ThreadPool threads are MTA and the
+                // approval prompt could silently fail/not become visible on some systems.
+                var promptThread=new Thread(()=>
+                {
+                    try
+                    {
+                        approved=MessageBox.Show(
+                            $"Allow pairing with {name}?\n\nOnly approve devices you recognize.",
+                            "WearOS Windows Bridge",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Question,
+                            MessageBoxDefaultButton.Button1,
+                            MessageBoxOptions.DefaultDesktopOnly)==DialogResult.Yes;
+                    }
+                    finally { done.Set(); }
+                });
+                promptThread.IsBackground=true;
+                promptThread.SetApartmentState(ApartmentState.STA);
+                promptThread.Start();
+                done.Wait(TimeSpan.FromSeconds(60));
             }
             var payload=approved
                 ? JsonSerializer.Serialize(new{type="pair_ok",key=Convert.ToBase64String(_key)})
