@@ -1,31 +1,32 @@
 package dev.caya.wearbridge
 
 import android.Manifest
-import android.content.Intent
-import android.os.Bundle
-import android.widget.*
 import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.view.Gravity
+import android.view.ViewGroup
+import android.widget.*
 
 class MainActivity : Activity() {
- override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState)
-  if (android.os.Build.VERSION.SDK_INT >= 31) requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 10)
+ override fun onCreate(savedInstanceState:Bundle?) { super.onCreate(savedInstanceState); requestBt(); buildUi() }
+ private fun requestBt(){ if(android.os.Build.VERSION.SDK_INT>=31 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED) requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT),7) }
+ private fun buildUi(){
+  val wear=DeviceModeDetector.detect(this)==DeviceMode.WEAR_OS
   val prefs=getSharedPreferences("bridge",MODE_PRIVATE)
-  val root=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(32,32,32,32) }
-  val mode=DeviceModeDetector.detect(this)
-  root.addView(TextView(this).apply { text="WearOS ↔ Windows Bridge\n${if(mode==DeviceMode.WEAR_OS) "Wear OS direct mode" else "Phone companion mode"}\nBluetooth preferred • LAN fallback"; textSize=if(mode==DeviceMode.WEAR_OS) 16f else 20f })
-  listOf("media" to "Media + Wear OS controls", "volume" to "Windows volume / mute", "clipboard" to "Clipboard text sync", "status" to "PC status").forEach { (key,label) ->
-   root.addView(Switch(this).apply { text=label; isChecked=prefs.getBoolean(key,key=="media"||key=="status"); setOnCheckedChangeListener { _,v->prefs.edit().putBoolean(key,v).apply() } })
-  }
-  val host=EditText(this).apply { hint="PC local IP (example 192.168.1.10)"; setText(prefs.getString("host","")) }
-  val bluetoothAddress=EditText(this).apply { hint="Paired PC Bluetooth MAC (optional)"; setText(prefs.getString("bluetoothAddress","")) }
-  val pairingKey=EditText(this).apply { hint="Pairing key (Base64, shown by Windows pairing UI)"; setText(prefs.getString("pairingKey","")) }
-  root.addView(host); root.addView(bluetoothAddress); root.addView(pairingKey)
-  root.addView(Button(this).apply { text="Save & start bridge"; setOnClickListener {
-   if (BridgeProtocol.decodeKey(pairingKey.text.toString()) == null) { Toast.makeText(this@MainActivity,"Pairing key must be a valid 256-bit Base64 key",Toast.LENGTH_LONG).show(); return@setOnClickListener }
-   prefs.edit().putString("host",host.text.toString().trim()).putString("bluetoothAddress",bluetoothAddress.text.toString().trim()).putString("pairingKey",pairingKey.text.toString().trim()).apply()
-   androidx.core.content.ContextCompat.startForegroundService(this@MainActivity,Intent(this@MainActivity,BridgeMediaService::class.java)); Toast.makeText(this@MainActivity,"Bridge started",Toast.LENGTH_SHORT).show()
-  } })
-  root.addView(TextView(this).apply { text="Clipboard is off by default. Pairing keys are stored locally and are never displayed in logs." })
-  setContentView(root)
+  val body=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; gravity=Gravity.CENTER_HORIZONTAL; val p=if(wear) 26 else 32; setPadding(p,p,p,p) }
+  fun text(value:String,size:Float=if(wear)14f else 18f)=TextView(this).apply { text=value; textSize=size; gravity=Gravity.CENTER_HORIZONTAL; setPadding(4,8,4,8) }
+  body.addView(text("WearOS ↔ Windows Bridge",if(wear)18f else 22f)); body.addView(text(if(wear) "Wear OS direct mode" else "Phone companion mode"))
+  val status=text("Connection: ${BridgeStatus.get(this).first}"); body.addView(status)
+  val ip=EditText(this).apply { hint="PC IP (auto if blank)"; setText(prefs.getString("host","")); isSingleLine=true }; body.addView(ip,ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT))
+  val bt=EditText(this).apply { hint="PC Bluetooth MAC (optional)"; setText(prefs.getString("btAddress","")); isSingleLine=true }; body.addView(bt,ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT))
+  val key=EditText(this).apply { hint="Pairing key"; setText(prefs.getString("pairingKey","")); isSingleLine=true }; body.addView(key,ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT))
+  body.addView(Button(this).apply { text="Find PC automatically"; setOnClickListener { isEnabled=false; Thread { val found=LanDiscovery.discover(); runOnUiThread { if(found!=null){ip.setText(found);Toast.makeText(this@MainActivity,"PC found: $found",Toast.LENGTH_SHORT).show()}else Toast.makeText(this@MainActivity,"PC not found on LAN",Toast.LENGTH_SHORT).show();isEnabled=true } }.start() } })
+  val features=listOf("media" to "Media","volume" to "Volume","clipboard" to "Clipboard","system" to "System stats")
+  val boxes=features.map { (k,label)-> CheckBox(this).apply { text=label; isChecked=prefs.getBoolean("feature_$k",true); body.addView(this) } to k }
+  body.addView(Button(this).apply { text="Save & start bridge"; setOnClickListener { prefs.edit().putString("host",ip.text.toString().trim()).putString("btAddress",bt.text.toString().trim()).putString("pairingKey",key.text.toString().trim()).apply { boxes.forEach{(b,k)->putBoolean("feature_$k",b.isChecked)} }.apply(); androidx.core.content.ContextCompat.startForegroundService(this@MainActivity,Intent(this@MainActivity,BridgeMediaService::class.java)); Toast.makeText(this@MainActivity,"Bridge started",Toast.LENGTH_SHORT).show() } })
+  body.addView(Button(this).apply { text="Refresh connection"; setOnClickListener { status.text="Connection: ${BridgeStatus.get(this@MainActivity).first}" } })
+  setContentView(ScrollView(this).apply { isFillViewport=true; addView(body,ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT)) })
  }
 }

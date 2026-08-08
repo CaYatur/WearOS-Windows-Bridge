@@ -30,8 +30,9 @@ class LanBridgeClient(
     private fun loop() {
         val prefs = context.getSharedPreferences("bridge", Context.MODE_PRIVATE)
         while (running.get()) {
-            val host = prefs.getString("host", "")?.trim().orEmpty()
+            var host = prefs.getString("host", "")?.trim().orEmpty()
             val key = BridgeProtocol.decodeKey(prefs.getString("pairingKey", "").orEmpty())
+            if (host.isBlank()) { host=LanDiscovery.discover().orEmpty(); if(host.isNotBlank()) prefs.edit().putString("host",host).apply() }
             if (host.isBlank() || key == null) { onConnection(false); sleep(); continue }
             try {
                 Socket().use { socket ->

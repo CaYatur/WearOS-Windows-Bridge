@@ -9,18 +9,33 @@ public sealed class BridgeAppContext : ApplicationContext
 {
     private readonly NotifyIcon _tray;
     private readonly byte[] _key;
-    public BridgeAppContext(byte[] key)
+    private readonly ConnectionStatus _status;
+    private readonly ToolStripMenuItem _connectionItem;
+    public BridgeAppContext(byte[] key, ConnectionStatus status)
     {
         _key = key;
+        _status = status;
         var menu = new ContextMenuStrip();
+        _connectionItem = new ToolStripMenuItem("Connection: Disconnected") { Enabled=false };
+        menu.Items.Add(_connectionItem);
         menu.Items.Add("Pairing info", null, (_,_) => ShowPairing());
         var startup = new ToolStripMenuItem("Start with Windows") { CheckOnClick=true, Checked=StartupManager.IsEnabled() };
         startup.CheckedChanged += (_,_) => { try { StartupManager.SetEnabled(startup.Checked); } catch(Exception ex) { MessageBox.Show(ex.Message,"Startup setting",MessageBoxButtons.OK,MessageBoxIcon.Error); startup.Checked=StartupManager.IsEnabled(); } };
         menu.Items.Add(startup);
         menu.Items.Add("Open GitHub", null, (_,_) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://github.com/CaYatur/WearOS-Windows-Bridge") { UseShellExecute=true }));
         menu.Items.Add("Exit", null, (_,_) => ExitThread());
-        _tray = new NotifyIcon { Text="WearOS Windows Bridge", Icon=SystemIcons.Application, Visible=true, ContextMenuStrip=menu };
+        _tray = new NotifyIcon { Text="WearOS Windows Bridge - Disconnected", Icon=SystemIcons.Application, Visible=true, ContextMenuStrip=menu };
         _tray.DoubleClick += (_,_) => ShowPairing();
+        _status.Changed += UpdateConnection;
+        UpdateConnection();
+    }
+
+    private void UpdateConnection()
+    {
+        if (_tray.ContextMenuStrip?.InvokeRequired == true) { _tray.ContextMenuStrip.BeginInvoke(UpdateConnection); return; }
+        var s=_status.Snapshot();
+        _connectionItem.Text=s.Connected ? $"Connection: {s.Transport}" : $"Connection: Disconnected{(s.LastSeen is null ? "" : $" (last {s.LastSeen:HH:mm:ss})")}";
+        _tray.Text=("WearOS Windows Bridge - "+(s.Connected?s.Transport:"Disconnected"))[..Math.Min(63,("WearOS Windows Bridge - "+(s.Connected?s.Transport:"Disconnected")).Length)];
     }
 
     private void ShowPairing()
