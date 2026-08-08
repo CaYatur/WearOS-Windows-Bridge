@@ -18,7 +18,7 @@ class BridgeMediaService : MediaSessionService() {
  override fun onCreate() {
   super.onCreate()
   remotePlayer = RemoteWindowsPlayer()
-  bridge = FailoverBridgeClient(this, { state -> remotePlayer.update(state) }, { transport -> remotePlayer.setConnected(transport != "Disconnected") })
+  bridge = FailoverBridgeClient(this, { state -> state.media?.let(remotePlayer::update) }, { transport -> remotePlayer.setConnected(transport != "Disconnected") })
   remotePlayer.commandSink = commandSink@{ command ->
    val prefs=getSharedPreferences("bridge",MODE_PRIVATE)
    val key=BridgeProtocol.decodeKey(prefs.getString("pairingKey","").orEmpty()) ?: return@commandSink

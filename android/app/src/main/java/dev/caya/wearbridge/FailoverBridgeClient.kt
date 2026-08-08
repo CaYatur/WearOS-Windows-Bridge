@@ -3,7 +3,7 @@ package dev.caya.wearbridge
 import android.content.Context
 
 /** Bluetooth is always preferred. LAN stays available as a warm fallback and carries traffic only while RFCOMM is down. */
-class FailoverBridgeClient(context:Context, onState:(RemoteMediaState)->Unit, onConnection:(String)->Unit) {
+class FailoverBridgeClient(context:Context, onState:(RemoteBridgeState)->Unit, onConnection:(String)->Unit) {
  @Volatile private var bluetoothUp=false
  @Volatile private var lanUp=false
  private val bluetooth=BluetoothBridgeClient(context,onState,{ up->bluetoothUp=up; onConnection(activeTransport()) })

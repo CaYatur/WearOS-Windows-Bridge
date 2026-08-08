@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class LanBridgeClient(
     private val context: Context,
-    private val onState: (RemoteMediaState) -> Unit,
+    private val onState: (RemoteBridgeState) -> Unit,
     private val onConnection: (Boolean) -> Unit
 ) {
     private val running = AtomicBoolean(false)

@@ -10,6 +10,8 @@ data class RemoteMediaState(
     val title: String?, val artist: String?, val album: String?, val sourceApp: String?,
     val playing: Boolean, val positionMs: Long, val durationMs: Long, val artworkBase64: String?
 )
+data class RemotePcState(val volume: Double, val muted: Boolean, val cpuPercent: Double, val memoryPercent: Double, val clipboardText: String?)
+data class RemoteBridgeState(val media: RemoteMediaState?, val pc: RemotePcState?)
 
 object BridgeProtocol {
     const val VERSION = "1"
@@ -38,7 +40,7 @@ object BridgeProtocol {
         "ping", JSONObject().put("enabledFeatures", enabledFeatures), key
     )
 
-    fun verifyAndReadState(line: String, key: ByteArray): RemoteMediaState? {
+    fun verifyAndReadState(line: String, key: ByteArray): RemoteBridgeState? {
         val root = JSONObject(line)
         if (root.optString("version") != VERSION) return null
         val ts = root.optLong("timestampUnixMs")
@@ -48,12 +50,15 @@ object BridgeProtocol {
         val payload = root.getJSONObject("payload")
         val canonical = "$VERSION\n$type\n$ts\n$nonce\n${payload}"
         if (!constantTimeEquals(hmacHex(key, canonical), root.optString("signature"))) return null
-        val media = payload.optJSONObject("media") ?: return null
-        return RemoteMediaState(
-            media.optNullableString("title"), media.optNullableString("artist"), media.optNullableString("album"),
-            media.optNullableString("sourceApp"), media.optBoolean("isPlaying"), media.optLong("positionMs"),
-            media.optLong("durationMs"), media.optNullableString("artworkBase64")
-        )
+        val mediaJson = payload.optJSONObject("media")
+        val media = mediaJson?.let {
+            RemoteMediaState(it.optNullableString("title"), it.optNullableString("artist"), it.optNullableString("album"),
+                it.optNullableString("sourceApp"), it.optBoolean("isPlaying"), it.optLong("positionMs"),
+                it.optLong("durationMs"), it.optNullableString("artworkBase64"))
+        }
+        val pcJson = payload.optJSONObject("pc")
+        val pc = pcJson?.let { RemotePcState(it.optDouble("masterVolume"), it.optBoolean("muted"), it.optDouble("cpuPercent"), it.optDouble("memoryPercent"), it.optNullableString("clipboardText")) }
+        return RemoteBridgeState(media, pc)
     }
 
     fun decodeKey(text: String): ByteArray? = try {

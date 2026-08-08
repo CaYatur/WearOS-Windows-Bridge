@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class BluetoothBridgeClient(
  private val context: Context,
- private val onState: (RemoteMediaState) -> Unit,
+ private val onState: (RemoteBridgeState) -> Unit,
  private val onConnection: (Boolean) -> Unit
 ) {
  companion object { val SERVICE_UUID: UUID = UUID.fromString("7e3d7b5a-3c51-4a32-93ab-c854b152e743") }
