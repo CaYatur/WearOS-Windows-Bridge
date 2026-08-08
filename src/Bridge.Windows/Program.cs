@@ -11,7 +11,7 @@ await media.InitializeAsync();
 using var features = new WindowsFeatures();
 var handler = new BridgeConnectionHandler(media, features, key);
 var status = new ConnectionStatus();
-using var host = new BridgeHost(handler, status);
+using var host = new BridgeHost(handler, status, key);
 host.Start();
 ApplicationConfiguration.Initialize();
 Application.Run(new BridgeAppContext(key, status));
