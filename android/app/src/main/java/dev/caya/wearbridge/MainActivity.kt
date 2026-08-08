@@ -4,14 +4,15 @@ import android.Manifest
 import android.content.Intent
 import android.os.Bundle
 import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
+import android.app.Activity
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
  override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState)
   if (android.os.Build.VERSION.SDK_INT >= 31) requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 10)
   val prefs=getSharedPreferences("bridge",MODE_PRIVATE)
   val root=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(32,32,32,32) }
-  root.addView(TextView(this).apply { text="WearOS ↔ Windows Bridge\nBluetooth preferred • LAN fallback"; textSize=20f })
+  val mode=DeviceModeDetector.detect(this)
+  root.addView(TextView(this).apply { text="WearOS ↔ Windows Bridge\n${if(mode==DeviceMode.WEAR_OS) "Wear OS direct mode" else "Phone companion mode"}\nBluetooth preferred • LAN fallback"; textSize=if(mode==DeviceMode.WEAR_OS) 16f else 20f })
   listOf("media" to "Media + Wear OS controls", "volume" to "Windows volume / mute", "clipboard" to "Clipboard text sync", "status" to "PC status").forEach { (key,label) ->
    root.addView(Switch(this).apply { text=label; isChecked=prefs.getBoolean(key,key=="media"||key=="status"); setOnCheckedChangeListener { _,v->prefs.edit().putBoolean(key,v).apply() } })
   }

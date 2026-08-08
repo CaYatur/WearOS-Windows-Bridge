@@ -8,8 +8,6 @@ android { namespace="dev.caya.wearbridge"; compileSdk=36
 
 dependencies {
     implementation("androidx.core:core-ktx:1.16.0")
-    implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.media3:media3-session:1.8.0")
     implementation("androidx.media3:media3-common:1.8.0")
-    implementation("androidx.media3:media3-exoplayer:1.8.0")
 }
