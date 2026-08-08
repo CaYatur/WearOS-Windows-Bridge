@@ -13,23 +13,23 @@ import com.google.common.util.concurrent.ListenableFuture
 class BridgeMediaService : MediaSessionService() {
  private var session: MediaSession? = null
  private lateinit var remotePlayer: RemoteWindowsPlayer
- private lateinit var lan: LanBridgeClient
+ private lateinit var bridge: FailoverBridgeClient
 
  override fun onCreate() {
   super.onCreate()
   remotePlayer = RemoteWindowsPlayer()
-  lan = LanBridgeClient(this, { state -> remotePlayer.update(state) }, { connected -> remotePlayer.setConnected(connected) })
+  bridge = FailoverBridgeClient(this, { state -> remotePlayer.update(state) }, { transport -> remotePlayer.setConnected(transport != "Disconnected") })
   remotePlayer.commandSink = commandSink@{ command ->
    val prefs=getSharedPreferences("bridge",MODE_PRIVATE)
    val key=BridgeProtocol.decodeKey(prefs.getString("pairingKey","").orEmpty()) ?: return@commandSink
-   lan.send(BridgeProtocol.command(key, command))
+   bridge.send(BridgeProtocol.command(key, command))
   }
   session = MediaSession.Builder(this, remotePlayer).build()
-  lan.start()
+  bridge.start()
  }
 
  override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
- override fun onDestroy() { lan.stop(); session?.release(); remotePlayer.release(); session=null; super.onDestroy() }
+ override fun onDestroy() { bridge.stop(); session?.release(); remotePlayer.release(); session=null; super.onDestroy() }
 }
 
 private class RemoteWindowsPlayer : SimpleBasePlayer(android.os.Looper.getMainLooper()) {
