@@ -21,7 +21,15 @@ public enum BridgeRejectReason { None, MalformedJson, VersionMismatch, StaleTime
 /// holds this id keeps the image it has.
 /// </param>
 public sealed record MediaState(string? Title, string? Artist, string? Album, string? SourceApp, bool IsPlaying, long PositionMs, long DurationMs, string? ArtworkBase64=null, string? ArtworkId=null);
-public sealed record PcState(double MasterVolume, bool Muted, double CpuPercent, double MemoryPercent, string? ClipboardText=null);
+public sealed record PcState(
+    double MasterVolume,
+    bool Muted,
+    double CpuPercent,
+    double MemoryPercent,
+    string? ClipboardText=null,
+    int? BatteryPercent=null,
+    bool? BatteryCharging=null,
+    bool? OnAcPower=null);
 public sealed record CommandPayload(MediaCommand? Media=null, long? SeekMs=null, double? Volume=null, bool? Muted=null, string? ClipboardText=null);
 
 public sealed record BridgePayload(

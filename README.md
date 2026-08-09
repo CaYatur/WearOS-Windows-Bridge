@@ -1,3 +1,5 @@
+# SOME THINGS MAY NOT WORK IN THE DEMO APP.
+
 # WearOS Windows Bridge
 
 Open-source Windows ↔ Android/Wear OS companion bridge. It mirrors Windows media sessions to an Android MediaSession so Wear OS can display/control PC playback, and provides opt-in Windows companion modules.

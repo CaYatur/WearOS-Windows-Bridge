@@ -12,7 +12,16 @@ data class RemoteMediaState(
     val playing: Boolean, val positionMs: Long, val durationMs: Long,
     val artworkBase64: String?, val artworkId: String?
 )
-data class RemotePcState(val volume: Double, val muted: Boolean, val cpuPercent: Double, val memoryPercent: Double, val clipboardText: String?)
+data class RemotePcState(
+    val volume: Double,
+    val muted: Boolean,
+    val cpuPercent: Double,
+    val memoryPercent: Double,
+    val clipboardText: String?,
+    val batteryPercent: Int?,
+    val batteryCharging: Boolean?,
+    val onAcPower: Boolean?
+)
 data class RemoteBridgeState(val media: RemoteMediaState?, val pc: RemotePcState?)
 
 /** Why an inbound frame was refused. Logged so a dead link says which check failed. */
@@ -98,7 +107,8 @@ object BridgeProtocol {
             RemotePcState(
                 it.optDouble("masterVolume", 0.0), it.optBoolean("muted"),
                 it.optDouble("cpuPercent", 0.0), it.optDouble("memoryPercent", 0.0),
-                it.optNullableString("clipboardText")
+                it.optNullableString("clipboardText"), it.optNullableInt("batteryPercent"),
+                it.optNullableBoolean("batteryCharging"), it.optNullableBoolean("onAcPower")
             )
         }
         reason(RejectReason.NONE)
@@ -141,4 +151,10 @@ object BridgeProtocol {
 
     private fun JSONObject.optNullableString(name: String): String? =
         if (!has(name) || isNull(name)) null else optString(name)
+
+    private fun JSONObject.optNullableInt(name: String): Int? =
+        if (!has(name) || isNull(name)) null else optInt(name)
+
+    private fun JSONObject.optNullableBoolean(name: String): Boolean? =
+        if (!has(name) || isNull(name)) null else optBoolean(name)
 }

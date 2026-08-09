@@ -32,9 +32,7 @@ public sealed class WindowsMediaBridge
     /// </param>
     public async Task<MediaState?> ReadAsync(string? knownArtworkId = null)
     {
-        GlobalSystemMediaTransportControlsSession? session;
-        try { session = _manager?.GetCurrentSession(); }
-        catch (Exception ex) { Log.Warn($"GetCurrentSession failed: {ex.Message}"); return null; }
+        var session = GetBestSession();
         if (session is null) return null;
 
         GlobalSystemMediaTransportControlsSessionMediaProperties? props = null;
@@ -107,12 +105,37 @@ public sealed class WindowsMediaBridge
         return (_artworkId, _artworkBase64);
     }
 
+    private GlobalSystemMediaTransportControlsSession? GetBestSession()
+    {
+        if (_manager is null) return null;
+        try
+        {
+            var sessions = _manager.GetSessions();
+            foreach (var candidate in sessions)
+            {
+                try
+                {
+                    if (candidate.GetPlaybackInfo().PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing)
+                        return candidate;
+                }
+                catch { /* a session can disappear while enumerating */ }
+            }
+
+            var current = _manager.GetCurrentSession();
+            if (current is not null) return current;
+            return sessions.Count > 0 ? sessions[0] : null;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"media session enumeration failed: {ex.Message}");
+            return null;
+        }
+    }
+
     public async Task ExecuteAsync(CommandPayload command)
     {
         if (command.Media is not { } c) return;
-        GlobalSystemMediaTransportControlsSession? s;
-        try { s = _manager?.GetCurrentSession(); }
-        catch (Exception ex) { Log.Warn($"GetCurrentSession failed: {ex.Message}"); return; }
+        var s = GetBestSession();
         if (s is null) { Log.Warn($"command {c} ignored: no active media session"); return; }
         try
         {

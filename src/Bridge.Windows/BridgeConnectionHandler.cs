@@ -107,6 +107,14 @@ public sealed class BridgeConnectionHandler(WindowsMediaBridge media, WindowsFea
                 // rather than showing the old value until the next scheduled push.
                 await PublishStateAsync(outgoing, session, ct);
             }
+            else if (request.Type is BridgeMessageType.Ping or BridgeMessageType.Hello)
+            {
+                // The Android side does not call the transport "connected" until it has verified
+                // one signed state frame. Reply to its first ping immediately instead of waiting
+                // for the one-second push tick; this also makes a real RFCOMM connection distinct
+                // from an OS-level Bluetooth bond that never reached the bridge protocol.
+                await PublishStateAsync(outgoing, session, ct);
+            }
         }
     }
 
@@ -202,8 +210,9 @@ public sealed class BridgeConnectionHandler(WindowsMediaBridge media, WindowsFea
             var (volume, muted) = enabled.HasFlag(BridgeFeature.Volume) ? features.ReadAudio() : (0d, false);
             var cpu = enabled.HasFlag(BridgeFeature.PcStatus) ? features.ReadCpuPercent() : 0;
             var memory = enabled.HasFlag(BridgeFeature.PcStatus) ? WindowsFeatures.ReadMemoryPercent() : 0;
+            var power = enabled.HasFlag(BridgeFeature.PcStatus) ? WindowsFeatures.ReadPowerState() : (null, null, null);
             var clipboard = enabled.HasFlag(BridgeFeature.Clipboard) ? features.ReadClipboardText() : null;
-            pc = new(volume, muted, cpu, memory, clipboard);
+            pc = new(volume, muted, cpu, memory, clipboard, power.Percent, power.Charging, power.OnAcPower);
         }
 
         var envelope = BridgeCodec.Sign(BridgeMessageType.State, new BridgePayload(enabled, mediaState, pc), key);

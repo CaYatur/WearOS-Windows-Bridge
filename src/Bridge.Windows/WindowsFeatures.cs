@@ -1,4 +1,5 @@
 using NAudio.CoreAudioApi;
+using Windows.System.Power;
 
 namespace Bridge.Windows;
 
@@ -76,6 +77,29 @@ public sealed class WindowsFeatures : IDisposable
             return Math.Clamp(100.0 * (info.TotalPhysicalMemory - info.AvailablePhysicalMemory) / info.TotalPhysicalMemory, 0, 100);
         }
         catch (Exception ex) { Log.Warn($"memory read failed: {ex.Message}"); return 0; }
+    }
+
+    /// <summary>
+    /// Laptop/tablet battery state from the Windows power manager. Desktop PCs usually report no
+    /// battery; nullable values let the watch distinguish that from a real 0% battery.
+    /// </summary>
+    public static (int? Percent, bool? Charging, bool? OnAcPower) ReadPowerState()
+    {
+        try
+        {
+            var status = PowerManager.BatteryStatus;
+            if (status == BatteryStatus.NotPresent) return (null, null, true);
+
+            var percent = Math.Clamp(PowerManager.RemainingChargePercent, 0, 100);
+            var charging = status == BatteryStatus.Charging;
+            var onAcPower = PowerManager.PowerSupplyStatus == PowerSupplyStatus.Adequate;
+            return (percent, charging, onAcPower);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"power read failed: {ex.Message}");
+            return (null, null, null);
+        }
     }
 
     /// <summary>

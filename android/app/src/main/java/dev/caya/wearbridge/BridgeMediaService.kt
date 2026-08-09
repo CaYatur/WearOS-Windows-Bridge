@@ -23,7 +23,9 @@ class BridgeMediaService : MediaSessionService() {
     companion object {
         private const val TAG = "WearBridgeService"
         private const val CHANNEL_ID = "bridge_status"
-        private const val NOTIFICATION_ID = 1001
+        // Media3's default media notification uses 1001. Keeping the bridge-status foreground
+        // notification on the same id lets the two notifications overwrite each other.
+        private const val STATUS_NOTIFICATION_ID = 2001
     }
 
     private var session: MediaSession? = null
@@ -33,9 +35,10 @@ class BridgeMediaService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         remotePlayer = RemoteWindowsPlayer()
-        bridge = FailoverBridgeClient(this, { state -> state.media?.let(remotePlayer::update) }) { transport ->
+        bridge = FailoverBridgeClient(this, { state -> remotePlayer.update(state) }) { transport ->
             BridgeStatus.set(this, transport)
             remotePlayer.setConnected(transport != "Disconnected")
+            updateStatusNotification(transport)
             Log.i(TAG, "transport is now $transport")
         }
         remotePlayer.commandSink = commandSink@{ command, seekMs ->
@@ -90,9 +93,19 @@ class BridgeMediaService : MediaSessionService() {
             }
         )
         ServiceCompat.startForeground(
-            this, NOTIFICATION_ID, buildNotification(text),
+            this, STATUS_NOTIFICATION_ID, buildNotification(text),
             if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0
         )
+    }
+
+    private fun updateStatusNotification(transport: String) {
+        val text = when (transport) {
+            "Bluetooth" -> "Connected to PC via Bluetooth"
+            "Wi-Fi" -> "Connected to PC via Wi-Fi"
+            else -> "Looking for the PC…"
+        }
+        getSystemService(NotificationManager::class.java)
+            ?.notify(STATUS_NOTIFICATION_ID, buildNotification(text))
     }
 
     private fun buildNotification(text: String): Notification {
@@ -114,6 +127,7 @@ private class RemoteWindowsPlayer : SimpleBasePlayer(android.os.Looper.getMainLo
     /** (command, seekMs) — seekMs is set only for an actual scrub. */
     var commandSink: (String, Long?) -> Unit = { _, _ -> }
     private var media: RemoteMediaState? = null
+    private var pc: RemotePcState? = null
     private var connected = false
 
     // The PC sends artwork bytes only when the track changes and repeats the id afterwards, so the
@@ -121,16 +135,19 @@ private class RemoteWindowsPlayer : SimpleBasePlayer(android.os.Looper.getMainLo
     private var artworkId: String? = null
     private var artwork: ByteArray? = null
 
-    fun update(value: RemoteMediaState) = android.os.Handler(applicationLooper).post {
-        if (value.artworkBase64 != null) {
-            artwork = runCatching { Base64.decode(value.artworkBase64, Base64.DEFAULT) }.getOrNull()
-            artworkId = value.artworkId
-        } else if (value.artworkId != artworkId) {
-            // Track changed and this frame carries no bytes for it: drop the stale image.
+    fun update(value: RemoteBridgeState) = android.os.Handler(applicationLooper).post {
+        val incomingMedia = value.media
+        if (incomingMedia?.artworkBase64 != null) {
+            artwork = runCatching { Base64.decode(incomingMedia.artworkBase64, Base64.DEFAULT) }.getOrNull()
+            artworkId = incomingMedia.artworkId
+        } else if (incomingMedia == null || incomingMedia.artworkId != artworkId) {
+            // A stopped/disappeared Windows session must clear the previous track too; otherwise
+            // Android keeps publishing stale metadata indefinitely after playback ends.
             artwork = null
-            artworkId = value.artworkId
+            artworkId = incomingMedia?.artworkId
         }
-        media = value
+        media = incomingMedia
+        pc = value.pc
         invalidateState()
     }
 
@@ -141,10 +158,13 @@ private class RemoteWindowsPlayer : SimpleBasePlayer(android.os.Looper.getMainLo
 
     override fun getState(): State {
         val m = media
+        val status = pc?.let(::pcSummary)
         val metadata = MediaMetadata.Builder()
-            .setTitle(m?.title ?: "Windows")
-            .setArtist(m?.artist)
+            .setTitle(m?.title ?: if (connected) "Windows PC" else "Windows")
+            .setArtist(m?.artist ?: status)
             .setAlbumTitle(m?.album)
+            .setSubtitle(status)
+            .setDescription(status)
             // setArtworkData takes real bytes. The old data: URI was never loaded by Media3's
             // default bitmap loader, so artwork simply never appeared.
             .apply { artwork?.let { setArtworkData(it, MediaMetadata.PICTURE_TYPE_FRONT_COVER) } }
@@ -173,8 +193,26 @@ private class RemoteWindowsPlayer : SimpleBasePlayer(android.os.Looper.getMainLo
             .setCurrentMediaItemIndex(0)
             .setContentPositionMs(m?.positionMs ?: 0)
             .setPlayWhenReady(m?.playing == true, Player.PLAY_WHEN_READY_CHANGE_REASON_REMOTE)
-            .setPlaybackState(if (connected && m != null) Player.STATE_READY else Player.STATE_IDLE)
+            // Keep a live media-session surface while the PC is connected even if Windows has no
+            // active media session. This lets Wear OS / OEM media surfaces show the PC status item
+            // instead of dropping the bridge entirely between tracks.
+            .setPlaybackState(if (connected) Player.STATE_READY else Player.STATE_IDLE)
             .build()
+    }
+
+    private fun pcSummary(value: RemotePcState): String {
+        val volume = (value.volume.coerceIn(0.0, 1.0) * 100.0).toInt()
+        val cpu = value.cpuPercent.coerceIn(0.0, 100.0).toInt()
+        val memory = value.memoryPercent.coerceIn(0.0, 100.0).toInt()
+        val volumeText = if (value.muted) "Muted" else "Vol $volume%"
+        val batteryText = value.batteryPercent?.let { percent ->
+            when {
+                value.batteryCharging == true -> "Battery $percent% charging"
+                value.onAcPower == true -> "Battery $percent% AC"
+                else -> "Battery $percent%"
+            }
+        }
+        return listOfNotNull(volumeText, "CPU $cpu%", "RAM $memory%", batteryText).joinToString(" · ")
     }
 
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
